@@ -23,7 +23,7 @@ CATEGORY_URL = MAIN_URL + 'en/toysrus/Category'
  
 
 
-# function to get url for each category
+# comsume main
 def get_categories():
     r = requests.get(CATEGORY_URL)
     soup = BeautifulSoup(r.text, 'lxml')
