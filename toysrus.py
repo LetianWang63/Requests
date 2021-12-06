@@ -1,9 +1,15 @@
+import math
 import requests
 import bs4
 import json
 import re
-from flask import Flask
 from bs4 import BeautifulSoup
+
+
+
+MAIN_URL = 'https://www.toysrus.ca/'
+CATEGORY_URL = MAIN_URL + 'en/toysrus/Category'
+SOURCE_URL = MAIN_URL + 'en/search-updategrid'
 
 
 
@@ -45,7 +51,10 @@ class Item:
 
         # find tag with upc
         tag_upc = soup.find(lambda tag: tag.name=='li' and 'UPC' in tag.text)
-        self.upc = tag_upc.find('strong').string
+        if tag_upc.find('strong') == None:
+            self.upc = 'None'
+        else:
+            self.upc = tag_upc.find('strong').string
 
         # find tag with img
         class_img = 'b-product_carousel-image_item js-product-image'
@@ -53,11 +62,6 @@ class Item:
         self.img = []
         for img in tag_img:
             self.img.append(img['src'])
-
-
-
-MAIN_URL = 'https://www.toysrus.ca/'
-CATEGORY_URL = MAIN_URL + 'en/toysrus/Category'
 
 
 
@@ -74,27 +78,39 @@ def list_category_url():
 
 # consume a category url, produce a list of url for all items
 def list_item_url(cat_url):
+    items = []
+
+    # get url for the first 24 items
     r = requests.get(cat_url)
-
-    '''
-    # find cgid
-    soup = BeautifulSoup(r.text, 'lxml')
-    tag = soup.find('body')
-    cgid = tag['data-querystring'][5:]
-
-    # find how many items
-    class_name = 'b-plp_header-results_count js-header-bar'
-    tag = soup.find('div', class_name).find_all('strong')[1]
-    default_num = 24
-    total_num = str(int(tag.string) - default_num)
-    '''
-
     soup = BeautifulSoup(r.text, 'lxml')
     class_name = 'b-tile_image_container-link js-pdp-link'
     tags = soup.find_all('a', class_name)
-    items = []
     for a in tags:
         items.append(MAIN_URL + a['href'])
+    
+    # find cgid of category
+    soup = BeautifulSoup(r.text, 'lxml')
+    tag = soup.find('body')
+    cat_id = tag['data-querystring'][5:]
+
+    # find how many items in total
+    class_name = 'b-plp_header-results_count js-header-bar'
+    tag = soup.find('div', class_name).find_all('strong')[1]
+    num_item = int(tag.string)
+
+    # iterate on source url to get all other items
+    item_per_page = 24
+    num_page = math.floor(int(tag.string) / 24)
+    for i in range(1, num_page + 1):
+        print(cat_url[len(CATEGORY_URL)+1:] + ' ' + str(i) + '/' + str(num_page))
+        page_params = {'cgid': cat_id, 'start': i*num_page, 'sz': num_page}
+        r = requests.get(SOURCE_URL, params=page_params)
+        soup = BeautifulSoup(r.text, 'lxml')
+        class_name = 'b-tile_image_container-link js-pdp-link'
+        tags = soup.find_all('a', class_name)
+        for a in tags:
+            items.append(MAIN_URL + a['href'])
+
     return(items)
 
 
